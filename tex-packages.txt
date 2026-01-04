@@ -1,0 +1,8 @@
+pgf
+quantikz
+braket
+geometry
+enumitem
+float
+qcircuit
+graphics

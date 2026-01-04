@@ -1,0 +1,55 @@
+{
+	"name": "LaTeX Development",
+	"dockerComposeFile": "../docker-compose.yaml",
+	"service": "latex",
+	"workspaceFolder": "/workdir",
+	
+	// Override the default command to keep container running for development
+	"overrideCommand": true,
+	
+	// Install VS Code extensions inside the container
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"James-Yu.latex-workshop",
+				"streetsidesoftware.code-spell-checker"
+			],
+			"settings": {
+				"latex-workshop.latex.autoBuild.run": "never",
+				"latex-workshop.latex.recipes": [
+					{
+						"name": "latexmk (pdf)",
+						"tools": [
+							"latexmk-pdf"
+						]
+					}
+				],
+				"latex-workshop.latex.tools": [
+					{
+						"name": "latexmk-pdf",
+						"command": "latexmk",
+						"args": [
+							"-pdf",
+							"-interaction=errorstopmode",
+							"-file-line-error",
+							"%DOC%"
+						]
+					}
+				],
+				"latex-workshop.latex.clean.fileTypes": [
+					"*.aux",
+					"*.fdb_latexmk",
+					"*.fls",
+					"*.log",
+					"*.synctex.gz"
+				]
+			}
+		}
+	},
+	
+	// Ensure the container stays running
+	"postCreateCommand": "echo 'LaTeX devcontainer ready!'",
+	
+	// Forward any ports if needed (none required for LaTeX)
+	"forwardPorts": []
+}

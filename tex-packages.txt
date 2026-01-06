@@ -1,8 +1,7 @@
-pgf
-quantikz
-braket
+qcircuit
+standalone
 geometry
 enumitem
+pgf
+quantikz
 float
-qcircuit
-graphics

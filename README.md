@@ -10,3 +10,8 @@ Or
 ```
 latexmk -pdf -interaction=errorstopmode -file-line-error main.tex && rm -f main.fdb_latexmk main.fls main.log
 ```
+
+To get circuits, use
+```
+print(grover_circuit.draw('latex_source'))
+```

@@ -1,20 +1,19 @@
 \documentclass{article}
 
 % ================== Packages ==================
-\usepackage{tikz}
-\usepackage{quantikz}
-\usepackage{braket}
-\usepackage[margin=1in]{geometry}
-\usepackage{enumitem}
+\usepackage[braket, qm]{qcircuit} % Qcircuit package
+\usepackage{graphicx}              % for \scalebox
+\usepackage[margin=1in]{geometry}  % page margins
+\usepackage{enumitem}              % lists
+\usepackage{amsmath}               % math
 \usepackage{float}
-\usepackage{amsmath}
 
 \allowdisplaybreaks
 
 % ================== Title ==================
-\title{Introduction to Quantum Information and Quantum Computing\\Assignment 1}
+\title{Introduction to Quantum Information and Quantum Computing\\Assignment 2}
 \author{Manuel Santos -- 2019231352}
-\date{November 2025}
+\date{January 2026}
 
 \begin{document}
 
@@ -22,163 +21,202 @@
 
 % ================== Introduction ==================
 \section*{Introduction}
-This report presents the solution to Assignment 1 of the Introduction to Quantum Information and Quantum Computing course.
+This report presents the solution to Assignment 2 of the Introduction to Quantum Information and Quantum Computing course.
 
-The goal of this assignment is to illustrate a fundamental feature of quantum mechanics: measurement outcomes do not, in general, possess predetermined values prior to measurement—unless one is willing to accept the possibility of faster-than-light communication.
+The objective of this assignment is to explore and implement Grover's Algorithm.
+In Grover’s algorithm, an oracle marks a secret computational basis state by inverting the sign of its amplitude, while leaving all other computational basis states unchanged.
+The goal of the algorithm is to identify the secret state using the smallest possible number of oracle queries.
+
+The assignment involves the following tasks:
+\begin{enumerate}[label=\arabic*.]
+    \item Prepare the oracle state $\ket{101}$.
+    \item Construct the diffusion operator circuit.
+    \item Combine the oracle and diffusion operator to form the full Grover's algorithm circuit.
+    \item Analyze the quantum state after the initial Hadamard gates and calculate the probability of measuring the secret state.
+    \item Determine the number of Grover cycles needed for a 3-qubit system to achieve a probability above 50\% of measuring the marked state.
+    \item Evaluate the number of queries required for a classical oracle to find the secret state in the worst and average cases.
+    \item Demonstrate that for a 2-qubit system, applying one Grover cycle results in a 100\% probability of measuring the secret state.
+\end{enumerate}
+
 
 % ================== 1 ==================
-\section{Preparation of a shared state}
+\section{Preparation of Grover's Oracle}
+In order to implement Grover's algorithm, we first need to prepare the oracle state.
+For this assignment, we will prepare the oracle state $\ket{101}$ as the one to be marked by the oracle.
+The circuit for preparing the oracle state is shown in Figure~\ref{fig:oracle_prep}.
 
-Alice (A), Bob (B), and Charlie (C) are separated from each other by a considerable distance. A source (S) prepares three qubits in the so-called $\ket{\mathrm{GHZ}}$ state, according to the circuit below, and sends one qubit to each of them. As always, the qubits start in the state
-\[
-\ket{000}\quad (\ket{\mathrm{CBA}}\ \text{ordering})
-\]
-before passing through the circuit.
-
-\begin{figure}[H]
+\begin{figure}[h!]
     \centering
-    \begin{minipage}{0.49\textwidth}
-        \centering
-        \begin{tikzpicture}[>=stealth, node distance=2cm]
-            \node[fill=black, circle, inner sep=2pt, label=above:{Bob}] (bob) at (0,3) {};
-            \node[fill=black, circle, inner sep=2pt, label=right:{Alice}] (alice) at (3,1.5) {};
-            \node[fill=black, circle, inner sep=2pt, label=below:{Charlie}] (charlie) at (0,0) {};
-            \node[draw, circle, inner sep=2pt, label=above:{S}] (s) at (1,1.5) {};
-            \draw[dashed] (bob) -- (alice) -- (charlie) -- (bob);
-            \draw[->, line width=1.2pt] (s) -- (bob);
-            \draw[->, line width=1.2pt] (s) -- (charlie);
-            \draw[->, line width=1.2pt] (s) -- (alice);
-        \end{tikzpicture}
-    \end{minipage}
-    \begin{minipage}{0.49\textwidth}
-        \centering
-        \begin{quantikz}
-            \lstick{$A:$} & \gate{H} & \slice[style=black]{$\ket{\mathrm{Barrier}}$} & & \ctrl{1} & & \ctrl{2} & & \slice[style=black]{$\ket{\mathrm{GHZ}}$} & & \\
-            \lstick{$B:$} &          &                                              & & \targ{}  & &           & & & & \\
-            \lstick{$C:$} &          &                                              & &          & & \targ{}  & & & &
-        \end{quantikz}
-    \end{minipage}
-    \caption{System layout and quantum circuit preparing the GHZ state}
-    \label{fig:ex1_system}
+    \scalebox{1.0}{
+    \Qcircuit @C=1em @R=1em {
+        \lstick{q_0:} & \qw      & \ctrl{1} & \qw      & \qw \\
+        \lstick{q_1:} & \gate{X} & \ctrl{1} & \gate{X} & \qw \\
+        \lstick{q_2:} & \gate{H} & \targ{}  & \gate{H} & \qw
+    }}
+    \caption{Circuit for Grover's Oracle Preparation}
+    \label{fig:oracle_prep}
 \end{figure}
 
-\begin{enumerate}[label=(\alph*)]
-    \item
-    \begin{enumerate}[label=\roman*)]
-        \item
-        Let $\ket{\mathrm{Barrier}}$ denote the state at the first barrier. Since the Hadamard gate is applied only to qubit $A$ (the least significant qubit in the $\ket{\mathrm{CBA}}$ ordering), we obtain
-        \[
-        \ket{000}
-        \xrightarrow{\mathrm{H}_A}
-        \ket{00}\!\left(\frac{\ket{0}+\ket{1}}{\sqrt{2}}\right)
-        =
-        \frac{1}{\sqrt{2}}\ket{000}
-        +
-        \frac{1}{\sqrt{2}}\ket{001}
-        = \ket{\mathrm{Barrier}}.
-        \]
+% Equivalent circuit / deconstruction
+In order to understand how this circuit works, we can represent it in an equivalent way, as shown in Figure~\ref{fig:oracle_deconstruction}.
 
-        \item
-        Starting from $\ket{\mathrm{Barrier}}$, we apply a CNOT gate with $A$ as control and $B$ as target, followed by a CNOT with $A$ as control and $C$ as target:
-        \[
-        \ket{\mathrm{Barrier}}
-        \xrightarrow{\mathrm{CNOT}_{A,B}}
-        \frac{1}{\sqrt{2}}\ket{000}
-        +
-        \frac{1}{\sqrt{2}}\ket{011}
-        \xrightarrow{\mathrm{CNOT}_{A,C}}
-        \frac{1}{\sqrt{2}}\ket{000}
-        +
-        \frac{1}{\sqrt{2}}\ket{111}
-        = \ket{\mathrm{GHZ}}.
-        \]
-    \end{enumerate}
+\begin{figure}[h!]
+    \centering
+    \scalebox{1.0}{
+    \Qcircuit @C=1.0em @R=0.2em @!R { \\
+        \nghost{{q}_{0} :  } & \lstick{{q}_{0} :  } & \qw \barrier[0em]{2} & \qw & \qw & \ctrl{1} & \qw \barrier[0em]{2} & \qw & \qw & \qw & \qw\\
+        \nghost{{q}_{1} :  } & \lstick{{q}_{1} :  } & \gate{\mathrm{X}} & \qw & \qw & \ctrl{1} & \qw & \qw & \gate{\mathrm{X}} & \qw & \qw\\
+        \nghost{{q}_{2} :  } & \lstick{{q}_{2} :  } & \qw & \qw & \gate{\mathrm{H}} & \targ & \gate{\mathrm{H}} & \qw & \qw & \qw & \qw\\
+    \\ }}
+    \caption{Deconstructed Oracle Circuit}
+    \label{fig:oracle_deconstruction}
+\end{figure}
 
-    At the first barrier, the system is in a superposition of $\ket{000}$ and $\ket{001}$. After the CNOT operations, this superposition is extended across all three qubits, producing the maximally entangled GHZ state.
+It's important to note that the oracle circuit flips the sign of the amplitude of the state $\ket{101}$, while leaving all other states unchanged.
+The use of a Toffoli gate sandwiched by H gates is equivalent to a controlled-Z gate, which applies a phase flip to the target qubit when both control qubits are in the state $\ket{1}$.
+This construction allows us to effectively mark the desired state in Grover's algorithm, previously prepared by the X gate on the second qubit.
 
-    \item
-    Measuring Alice’s qubit collapses the state:
-    \begin{itemize}
-        \item If Alice measures $0$, Bob and Charlie collapse to $\ket{00}$
-        \item If Alice measures $1$, Bob and Charlie collapse to $\ket{11}$
-    \end{itemize}
-    From Bob’s or Charlie’s local perspective, the outcomes remain random until classical communication occurs.
-
-    \item
-    Since $\ket{\mathrm{GHZ}}$ is an equal superposition of $\ket{000}$ and $\ket{111}$, we expect each outcome with probability $1/2$. This behavior is confirmed by simulation, as shown in Figure~\ref{fig:ex1_c}.
-
-    \begin{figure}[H]
-        \centering
-        \includegraphics[width=0.5\textwidth]{Images/1_c.png}
-        \caption{Simulation results for 1024 shots}
-        \label{fig:ex1_c}
-    \end{figure}
-\end{enumerate}
 
 % ================== 2 ==================
-\section{Independent Operations}
+\section{Diffusion Operator Circuit}
+The diffusion operator, also known as the inversion about the mean, is a crucial component of Grover's algorithm.
+The circuit for the diffusion operator is shown in Figure~\ref{fig:diffusion_operator}.
 
-After receiving their qubits, Alice, Bob, and Charlie independently apply either
-\[
-M_X = H \quad \text{or} \quad M_Y = HS^\dagger,
-\]
-followed by measurement.
+\begin{figure}[h!]
+    \centering
+    \scalebox{1.0}{
+    \Qcircuit @C=1.0em @R=0.2em @!R { \\
+        \nghost{{q}_{0} :  } & \lstick{{q}_{0} :  } & \gate{\mathrm{H}} & \gate{\mathrm{X}} \barrier[0em]{2} & \qw & \qw & \ctrl{1} & \qw \barrier[0em]{2} & \qw & \gate{\mathrm{X}} & \gate{\mathrm{H}} & \qw & \qw\\
+        \nghost{{q}_{1} :  } & \lstick{{q}_{1} :  } & \gate{\mathrm{H}} & \gate{\mathrm{X}} & \qw & \qw & \ctrl{1} & \qw & \qw & \gate{\mathrm{X}} & \gate{\mathrm{H}} & \qw & \qw\\
+        \nghost{{q}_{2} :  } & \lstick{{q}_{2} :  } & \gate{\mathrm{H}} & \gate{\mathrm{X}} & \qw & \gate{\mathrm{H}} & \targ & \gate{\mathrm{H}} & \qw & \gate{\mathrm{X}} & \gate{\mathrm{H}} & \qw & \qw\\
+    \\ }}
+    \caption{Diffusion Operator Circuit}
+    \label{fig:diffusion_operator}
+\end{figure}
 
-\begin{enumerate}[label=(\alph*)]
-    \item
-    When all three apply $M_X$, the resulting state $\ket{\mathrm{XXX}}$ is produced by the circuit in Figure~\ref{fig:mx_circuit}.
+The diffusion operator works by first applying Hadamard gates to all qubits, followed by X gates.
+Then, a controlled-Z operation is performed using a Toffoli gate sandwiched by H gates.
+Finally, the X and H gates are applied again to complete the diffusion process.
+This operator amplifies the amplitude of the marked state, increasing the probability of measuring it in the final step of Grover's algorithm.
 
-    \begin{figure}[H]
-        \centering
-        \begin{quantikz}[wire types={q,q,q,c}]
-            \lstick{$A:$} & \gate{H} & \ctrl{1} & \ctrl{2} & \slice{$\ket{\mathrm{GHZ}}$} & & \gate{H} & & \meter{} & \\
-            \lstick{$B:$} &          & \targ{}  &          &                              & & \gate{H} & &          & \meter{} \\
-            \lstick{$C:$} &          &          & \targ{}  &                              & & \gate{H} & &          &          \meter{}
-        \end{quantikz}
-        \caption{Circuit XXX: all parties apply $M_X = H$}
-        \label{fig:mx_circuit}
-    \end{figure}
 
-    Applying the Hadamard gates yields
-    \[
-    \ket{\mathrm{XXX}}
-    =
-    \frac{1}{2}
-    \big(
-    \ket{000}
-    +
-    \ket{011}
-    +
-    \ket{101}
-    +
-    \ket{110}
-    \big).
-    \]
+% ================== 3 =================
+% Full Grover's Algorithm
+\section{Grover's Algorithm Circuit}
+The full Grover's algorithm circuit with oracle and diffusion operators is shown in Figure~\ref{fig:grover_full}.
 
-    Simulation results are shown in Figure~\ref{fig:ex2_XXX}.
+\begin{figure}[h!]
+    \centering
+    \scalebox{1.0}{
+    \Qcircuit @C=1.0em @R=0.2em @!R { \\
+        \nghost{{q}_{0} :  } & \lstick{{q}_{0} :  } & \gate{\mathrm{H}} \barrier[0em]{2} & \qw & \multigate{2}{\mathrm{Oracle}}_<<<{0} & \multigate{2}{\mathrm{Diffusion}}_<<<{0} \barrier[0em]{2} & \qw & \multigate{2}{\mathrm{Oracle}}_<<<{0} & \multigate{2}{\mathrm{Diffusion}}_<<<{0} \barrier[0em]{2} & \qw & \meter & \qw & \qw & \qw & \qw\\
+        \nghost{{q}_{1} :  } & \lstick{{q}_{1} :  } & \gate{\mathrm{H}} & \qw & \ghost{\mathrm{Oracle}}_<<<{1} & \ghost{\mathrm{Diffusion}}_<<<{1} & \qw & \ghost{\mathrm{Oracle}}_<<<{1} & \ghost{\mathrm{Diffusion}}_<<<{1} & \qw & \qw & \meter & \qw & \qw & \qw\\
+        \nghost{{q}_{2} :  } & \lstick{{q}_{2} :  } & \gate{\mathrm{H}} & \qw & \ghost{\mathrm{Oracle}}_<<<{2} & \ghost{\mathrm{Diffusion}}_<<<{2} & \qw & \ghost{\mathrm{Oracle}}_<<<{2} & \ghost{\mathrm{Diffusion}}_<<<{2} & \qw & \qw & \qw & \meter & \qw & \qw\\
+        \nghost{\mathrm{{meas} :  }} & \lstick{\mathrm{{meas} :  }} & \lstick{/_{_{3}}} \cw & \cw & \cw & \cw & \cw & \cw & \cw & \cw & \dstick{_{_{\hspace{0.0em}0}}} \cw \ar @{<=} [-3,0] & \dstick{_{_{\hspace{0.0em}1}}} \cw \ar @{<=} [-2,0] & \dstick{_{_{\hspace{0.0em}2}}} \cw \ar @{<=} [-1,0] & \cw & \cw\\
+    \\ }}
+    \caption{Full Grover's Algorithm Circuit}
+    \label{fig:grover_full}
+\end{figure}
 
-    \begin{figure}[H]
-        \centering
-        \includegraphics[width=0.5\textwidth]{Images/2_a.png}
-        \caption{Simulation results for circuit XXX (1024 shots)}
-        \label{fig:ex2_XXX}
-    \end{figure}
+In this circuit, we start by applying Hadamard gates to all qubits to create an equal superposition of all possible states.
+Then, we apply the oracle and diffusion operators multiple times to amplify the amplitude of the marked state $\ket{101}$.
+Finally, we measure the qubits to obtain the result.
 
-    \item
-    The possible outcomes are $\ket{000}$, $\ket{011}$, $\ket{101}$, and $\ket{110}$. In all cases, the sum $a+b+c$ is even.
+After executing the circuit, we expect to measure the state $\ket{101}$ with high probability, demonstrating the effectiveness of Grover's algorithm in searching for a marked item in an unsorted database.
+Running the circuit 1024 times yields the expected result, confirming the successful implementation of Grover's algorithm, as shown in Figure~\ref{fig:grover_result}.
 
-    \item
-    When exactly one party applies $M_X$ and the others apply $M_Y$, only four outcomes occur, and the sum $a+b+c$ is always odd.
+\begin{figure}[H]
+% \begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.6\textwidth]{Images/grover_result.png}
+    \caption{Measurement Results after Executing 2 cycles of Grover's Algorithm}
+    \label{fig:grover_result}
+\end{figure}
 
-    \item
-    The outcomes for each configuration are:
-    \begin{itemize}
-        \item YYX, YXY, XYY:
-        \[
-        (C,B,A) = (0,0,1), (0,1,0), (1,0,0), (1,1,1).
-        \]
-    \end{itemize}
-    These results confirm the GHZ correlations.
-\end{enumerate}
+
+% ================== 4 =================
+\section{What is the quantum state in which the circuit is after the initial application of Hadamard gates? 
+At this point in the circuit, what is the probability of measuring the secret state?}
+
+After the initial application of Hadamard gates, the quantum state of the system is an equal superposition of all possible states for 3 qubits.
+The state can be expressed as:
+\[\ket{\psi} = \frac{1}{\sqrt{8}} (\ket{000} + \ket{001} + \ket{010} + \ket{011} + \ket{100} + \ket{101} + \ket{110} + \ket{111})\]
+
+As so, the probability of measuring the secret state $\ket{101}$ at this point in the circuit is given by the square of the amplitude associated with that state.
+Since the amplitude of each state in the superposition is $\frac{1}{\sqrt{8}}$, the probability of measuring the secret state is:
+\[P(\ket{101}) = \left|\frac{1}{\sqrt{8}}\right|^2 = \frac{1}{8} = 0.125\]
+Thus, the probability of measuring the secret state $\ket{101}$ after the initial application of Hadamard gates is 12.5\%.
+
+
+% ================== 5 =================
+\section{For $n$ qubits, the oracle marks only one state out of the $N=2^n$ states of the computational basis.
+To obtain the marked state with probability above 50\%, it is typical to apply $k$ Grover cycles, with $k \approx \frac{\pi}{4}\sqrt{N}$. 
+What should $k$ be for a system of 3 qubits (round to the nearest integer)? 
+What is the relationship with the number of cycles used in this problem?}
+
+For a system of 3 qubits, we have \( n = 3 \), which means the total number of states in the computational basis is \( N = 2^n = 2^3 = 8 \).
+To determine the number of Grover cycles \( k \) needed to obtain the marked state with probability above 50\%, we can use the formula:
+\[k \approx \frac{\pi}{4}\sqrt{N}\]
+Substituting \( N = 8 \) into the formula, we get:
+\[k \approx \frac{\pi}{4}\sqrt{8} = \frac{\pi}{4} \times 2\sqrt{2} = \frac{\pi\sqrt{2}}{2}\]
+Calculating this value numerically:
+\[\frac{\pi\sqrt{2}}{2} \approx \frac{3.1416 \times 1.4142}{2} \approx \frac{4.4429}{2} \approx 2.22145\]
+Rounding to the nearest integer, we find:
+\[k \approx 2\]
+In this problem, we used 2 Grover cycles, which aligns perfectly with the calculated value of \( k \) for a system of 3 qubits.
+This confirms that the number of Grover cycles used in the problem is appropriate for achieving a high probability of measuring the marked state.
+
+
+% ================== 6 ==================
+\section{On a classical computer, we can only give the oracle one state $\ket{a}$ at a time. 
+In turn, the oracle can give only one of two answers: “Yes, $\ket{a}$ is the secret state” or “No, $\ket{a}$ is not the secret state.” 
+In the worst case, for three bits (as in this problem), how many queries would we need to make to find the secret state using a classical oracle? 
+And on average?}
+
+In the worst-case scenario, using a classical oracle to find the secret state among 3 bits (which corresponds to 8 possible states: $\ket{000}$, $\ket{001}$, $\ket{010}$, $\ket{011}$, $\ket{100}$, $\ket{101}$, $\ket{110}$, and $\ket{111}$), we would need to query the oracle for each state until we find the secret state.
+
+In the worst case, the secret state is the last one we check, so we would need to make 8 queries.
+On average, assuming each state is equally likely to be the secret state, we would expect to check half of the states before finding the secret one. Therefore, the average number of queries needed is:
+\[\frac{8}{2} = 4\]
+
+Thus, in the worst case, we would need 8 queries to find the secret state using a classical oracle, and on average, we would need 4 queries.
+
+
+% ================== 7 ==================
+\section{In general, the amplitude associated with the secret state before applying the Grover cycles is $1/\sqrt{N}$, where $N=2^n$ and $n$ is the number of qubits. 
+We can define the angle $\theta$ such that $\sin \theta = 1/\sqrt{N}$. With $k$ Grover cycles, the probability of measuring the secret state is $|\sin((2k+1)\theta)|^2$. 
+Show that, for $n=2$ qubits, the probability of measuring the secret state is 100\% by applying just one Grover cycle.}
+
+For \( n = 2 \) qubits, the total number of states in the computational basis is \( N = 2^n = 2^2 = 4 \).
+The amplitude associated with the secret state before applying the Grover cycles is given by:
+\[\frac{1}{\sqrt{N}} = \frac{1}{\sqrt{4}} = \frac{1}{2}\]
+We can define the angle \( \theta \) such that:
+\[\sin \theta = \frac{1}{\sqrt{N}} = \frac{1}{2}\]
+This implies that:
+\[\theta = \sin^{-1}\left(\frac{1}{2}\right) = \frac{\pi}{6}\]
+Now, we apply one Grover cycle, which means \( k = 1 \).
+The probability of measuring the secret state after applying \( k \) Grover cycles is given by:
+\[P = |\sin((2k + 1)\theta)|^2\]
+Substituting \( k = 1 \) and \( \theta = \frac{\pi}{6} \):
+\[P = |\sin((2 \cdot 1 + 1) \cdot \frac{\pi}{6})|^2 = |\sin(3 \cdot \frac{\pi}{6})|^2 = |\sin(\frac{\pi}{2})|^2\]
+Since \( \sin(\frac{\pi}{2}) = 1 \), we have:
+\[P = |1|^2 = 1\]
+Thus, the probability of measuring the secret state after applying just one Grover cycle for \( n = 2 \) qubits is 100\%.
+
+
+% ================== Conclusion ==================
+\section*{Conclusion}
+
+This report has detailed the implementation and analysis of Grover's algorithm for a 3-qubit system.
+We have successfully prepared the oracle state, constructed the diffusion operator, and combined them to form the full Grover's algorithm circuit.
+
+\paragraph{} The analysis of the quantum state after the initial Hadamard gates revealed a 12.5\% probability of measuring the secret state, which was significantly amplified through the application of Grover cycles.
+We determined that 2 Grover cycles are optimal for a 3-qubit system to achieve a probability above 50\% of measuring the marked state.
+
+\paragraph{} Additionally, we compared the performance of Grover's algorithm with a classical oracle, highlighting the efficiency of the quantum approach.
+Finally, we demonstrated that for a 2-qubit system, applying one Grover cycle results in a 100\% probability of measuring the secret state.
+
+\paragraph{} I personally found this assignment a good opportunity to explore in more detail Grover's algorithm and its components, as well as to understand the advantages of quantum computing over classical methods in search problems.
+Besides that, I took the chance to read the original paper by Lov K. Grover, which provided valuable insights into the algorithm's design and functionality.
 
 \end{document}

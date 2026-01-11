@@ -1,6 +1,6 @@
 {
 	"name": "LaTeX Development",
-	"dockerComposeFile": "../docker-compose.yaml",
+	"dockerComposeFile": "../.devcontainer/docker-compose.yaml",
 	"service": "latex",
 	"workspaceFolder": "/workdir",
 	

@@ -15,7 +15,8 @@
         "-f",
         "main.fdb_latexmk",
         "main.fls",
-        "main.log"
+        "main.log",
+        "main.out"
       ],
       "group": {
         "kind": "build",

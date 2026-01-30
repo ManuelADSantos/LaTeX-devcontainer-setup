@@ -18,7 +18,7 @@ This repository contains a basic setup for writing documents using LaTeX in a de
 
 4. Inside the devcontainer, you can compile your LaTeX documents using the following command:
     ```
-    latexmk -pdf -interaction=errorstopmode -file-line-error main.tex && rm -f main.fdb_latexmk main.fls main.log
+    latexmk -pdf -interaction=errorstopmode -file-line-error main.tex && rm -f main.fdb_latexmk main.fls main.log main.bbl main.blg
     ```
     For ease of use, you can also use the prebuilt task:
     - Open the command palette (Ctrl+Shift+P or Cmd+Shift+P).
